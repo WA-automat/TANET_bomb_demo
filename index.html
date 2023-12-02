@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫雷</title>
+    <style>
+        #main {
+            margin: 50px auto;
+        }
+
+        #nav {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        #nav .bar {
+            margin-bottom: 5px;
+        }
+
+        #nav .tips {
+            color: red;
+        }
+
+        button {
+            padding: 5px 15px;
+            background-color: #02a4ad;
+            border: none;
+            color: #fff;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+            transition: 0.5s;
+        }
+
+        button:hover {
+            background-color: #00abff;
+        }
+
+        table {
+            border-spacing: 1px;
+            background-color: #929196;
+            margin: 0 auto;
+        }
+
+        td {
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            background-color: #ccc;
+            border: 2px solid;
+            border-color: #fff #a1a1a1 #a1a1a1 #fff;
+            text-align: center;
+            line-height: 20px;
+            font-weight: bold;
+        }
+
+        .blocks {
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            display: block;
+            text-align: center;
+            user-select: none;
+            cursor: pointer;
+        }
+
+        .bomb {
+            background: #d9d9d9 url(./images/bomb.png) no-repeat center;
+            background-size: cover;
+        }
+
+        .flag {
+            background: #ccc url(./images/flag.png) no-repeat center;
+            background-size: cover;
+        }
+
+    </style>
+</head>
+
+<body>
+<div id="main">
+    <div id="nav">
+        <h1>扫雷游戏</h1>
+        <div class='bar'>剩余雷数：<label id='count'>0</label></div>
+        <div class='bar'>计时：<label id='time'>0</label>s</div>
+        <div class="bar tips">左键扫雷，右键插旗，再次点击右键拔旗</div>
+        <button id="restart">重新开始</button>
+    </div>
+
+    <div id="game-map"></div>
+
+    <script>
+        // 禁用右键菜单
+        document.oncontextmenu = () => {
+            return false;
+        }
+
+        // 变量
+        let numberOfBomb = 40;
+        let row = 16;
+        let col = 16;
+        let grid = init()
+        let firstOpen = true;
+
+        // 创建一个定时器
+        let time = document.getElementById("time");
+        setInterval(function () {
+            time.innerHTML = (parseFloat(time.innerHTML) + 0.01).toFixed(2); //保留两位小数
+        }, 10)
+
+        // 初始化雷计数器
+        let myCount = document.getElementById("count");
+        myCount.innerHTML = String(numberOfBomb)
+
+        // 重新开始(点击事件)
+        let button = document.getElementById("restart");
+        button.addEventListener("click", function () {
+            window.document.location.reload()   // 刷新页面
+        })
+
+        // 初始化
+        function init() {
+            // 生成矩阵html <tr>--行标签 <td>--列标签
+            let gridHtml = '';
+            gridHtml += '<table>'
+            for (let i = 0; i < row; i++) {
+                gridHtml += '<tr>'
+                for (let j = 0; j < col; j++) {
+                    gridHtml +=
+                        '<td><span class="blocks" onmousedown="block_click(' + i + ',' + j + ',event)"></span></td>';
+                }
+                gridHtml += '</tr>'
+            }
+            gridHtml += '</table>'
+
+            // 写入html
+            document.getElementById('game-map').innerHTML = gridHtml;
+
+            // 返回矩阵二维数组
+            let blocks = document.getElementsByClassName('blocks');
+            let grid = [];
+            for (let i = 0; i < blocks.length; i++) {
+                if (i % col === 0) {
+                    grid.push([]);
+                }
+                // 初始化计雷数
+                blocks[i].count = 0;
+                grid[Math.floor(i / col)].push(blocks[i]);
+            }
+            return grid;
+        }
+
+        // 打开方格函数
+        function openBlock(i, j) {
+
+            // 获取对应方格
+            let block = grid[i][j];
+            block.isOpen = true;
+
+            // 打开了已经插旗的格子
+            if (block.classList.contains('flag')) {
+                block.classList.remove('flag');
+                myCount.innerHTML = String(parseInt(myCount.innerHTML) + 1);
+            }
+
+            if (block.isBomb) {
+                // 踩雷
+                block.classList.add("bomb");
+                for (let i = 0; i < row; i++) {
+                    for (let j = 0; j < col; j++) {
+                        block = grid[i][j];
+                        if (!block.isOpen && block.isBomb) {
+                            block.isOpen = true;
+                            // 打开了已经插旗的格子
+                            if (block.classList.contains('flag')) {
+                                block.classList.remove('flag');
+                                myCount.innerHTML = String(parseInt(myCount.innerHTML) + 1);
+                            }
+                            block.classList.add("bomb");
+                        }
+                    }
+                }
+                alert("您踩到雷了，游戏结束！");
+            } else if (block.count === 0) {
+                // 打开计雷数为0的方格(深度优先搜索dfs)
+                // 为 0 的修改一下背景颜色
+                block.style.backgroundColor = "#777"
+                //遍历九宫格内的方格
+                for (let _i = i - 1; _i <= i + 1; _i++) {
+                    for (let _j = j - 1; _j <= j + 1; _j++) {
+                        //判断是否越界&&跳过已打开的方格&&非雷
+                        if (_i > -1 && _j > -1 && _i < row && _j < col && !grid[_i][_j].isOpen && !grid[_i][_j].isBomb) {
+                            //递归打开方格函数
+                            openBlock(_i, _j);
+                        }
+                    }
+                }
+            } else {
+                // 打开计雷数不为0的方格
+                block.innerHTML = block.count;
+            }
+        }
+
+        // 点击格子
+        function block_click(i, j, e) {
+            // 格子已经被打开过
+            if (grid[i][j].isOpen) {
+                return;
+            }
+
+            // 左键打开
+            if (e.button === 0) {
+                // 保证第一次打开不踩雷，所以第一次点击再生成雷
+                if (firstOpen) {
+                    firstOpen = false;  // 修改标记
+                    let cnt = 0;
+                    // 生成 numberOfBomb 个炸弹
+                    while (cnt < numberOfBomb) {
+                        // 生成随机坐标
+                        let r = Math.floor(Math.random() * row);
+                        let c = Math.floor(Math.random() * col);
+                        // 保证炸弹不是第一次打开的位置，并且炸弹位置不能重复
+                        if (!(r === i && c === j) && !grid[r][c].isBomb) {
+                            grid[r][c].isBomb = true;
+                            cnt += 1
+
+                            // 更新当前格子周围八个格子的雷数
+                            for (let _i = r - 1; _i <= r + 1; _i++) {
+                                for (let _j = c - 1; _j <= c + 1; _j++) {
+                                    // 判断坐标防越界
+                                    if (_i > -1 && _j > -1 && _i < row && _j < col) {
+                                        // 计雷数 + 1
+                                        grid[_i][_j].count++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                openBlock(i, j);
+            }
+            // 右键打开
+            else if (e.button === 2) {
+                e.preventDefault()
+                let block = grid[i][j];
+                if (block.classList.contains('flag')) {
+                    block.classList.remove('flag');
+                    console.log('已删除 flag 类名');
+                    myCount.innerHTML = String(parseInt(myCount.innerHTML) + 1);
+                } else {
+                    block.classList.add('flag');
+                    console.log('已添加 flag 类名');
+                    myCount.innerHTML = String(parseInt(myCount.innerHTML) - 1);
+                }
+            }
+
+            //判断游戏是否结束(所有的非雷方格已打开)
+            for (let i = 0; i < row; i++) {
+                for (let j = 0; j < col; j++) {
+                    if (!grid[i][j].isBomb && !grid[i][j].isOpen) {
+                        return;
+                    }
+                }
+            }
+            alert("游戏胜利\n" + "用时：" + time.innerHTML);
+        }
+    </script>
+</div>
+</body>
+</html>
